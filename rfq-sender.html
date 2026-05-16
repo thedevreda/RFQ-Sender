@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RFQ Sender</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f0f11;--bg2:#17171a;--bg3:#1e1e22;--bg4:#26262c;--bg5:#2d2d34;
+  --border:#2a2a32;--border2:#353540;
+  --text:#f0eee8;--muted:#7c7c8a;--muted2:#4e4e5a;
+  --brand:#e8c547;--brand-d:#c9a82e;--brand-bg:rgba(232,197,71,.08);
+  --green:#4ade80;--green-bg:rgba(74,222,128,.08);
+  --red:#f87171;--red-bg:rgba(248,113,113,.08);
+  --blue:#60a5fa;
+  --amber:#f59e0b;
+  --font:'Syne',sans-serif;--mono:'DM Mono',monospace;
+  --r:6px;--r2:10px;
+  --sh:0 2px 16px rgba(0,0,0,.5);
+}
+html{scroll-behavior:smooth}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;line-height:1.5}
+
+/* ── Layout ── */
+.app{display:grid;grid-template-columns:380px 1fr;grid-template-rows:auto 1fr;min-height:100vh}
+.topbar{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:56px;background:var(--bg2);border-bottom:1px solid var(--border);gap:12px;flex-wrap:wrap}
+.logo{font-size:18px;font-weight:800;letter-spacing:-.5px;white-space:nowrap}
+.logo span{color:var(--brand)}
+.sidebar{background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;height:calc(100vh - 56px);position:sticky;top:56px}
+.main{padding:18px;overflow-y:auto;height:calc(100vh - 56px);display:flex;flex-direction:column;gap:14px}
+
+/* ── Auth ── */
+.btn-auth{display:flex;align-items:center;gap:7px;padding:7px 16px;border-radius:30px;font-family:var(--font);font-size:11px;font-weight:700;cursor:pointer;border:1.5px solid var(--brand);background:transparent;color:var(--brand);transition:.15s;letter-spacing:.3px;white-space:nowrap}
+.btn-auth:hover{background:var(--brand);color:#000}
+.btn-auth.on{border-color:var(--green);color:var(--green)}
+.btn-auth.on:hover{background:var(--green);color:#000}
+.pulse{width:7px;height:7px;border-radius:50%;background:currentColor;flex-shrink:0}
+
+/* ── Sidebar sections ── */
+.sb-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--bg3);flex-shrink:0;gap:8px}
+.sb-title{font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;display:flex;align-items:center;gap:6px}
+.sb-actions{display:flex;gap:5px;flex-shrink:0}
+
+/* Search bar */
+.search-wrap{padding:10px 12px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg2)}
+.search-inp{width:100%;background:var(--bg3);border:1.5px solid var(--border2);border-radius:var(--r);color:var(--text);font-family:var(--mono);font-size:11px;padding:7px 10px 7px 32px;outline:none;transition:border .12s;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%237c7c8a' stroke-width='2.5'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:10px center}
+.search-inp:focus{border-color:var(--brand)}
+.search-inp::placeholder{color:var(--muted2)}
+
+/* Contacts list */
+.contacts-list{flex:1;overflow-y:auto;padding:8px}
+.contacts-list::-webkit-scrollbar{width:4px}
+.contacts-list::-webkit-scrollbar-track{background:transparent}
+.contacts-list::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+/* Company group */
+.company-group{margin-bottom:6px;border:1px solid var(--border);border-radius:var(--r2);overflow:hidden}
+.company-header{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg3);cursor:pointer;user-select:none;transition:.1s}
+.company-header:hover{background:var(--bg4)}
+.company-header.all-selected{background:var(--brand-bg);border-color:var(--brand)}
+.company-name{font-size:11px;font-weight:700;color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.company-count{font-size:9px;color:var(--muted);font-family:var(--mono);flex-shrink:0}
+.company-emails{display:none;flex-direction:column;gap:1px;padding:4px 6px 6px}
+.company-emails.open{display:flex}
+.email-row{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:var(--r);cursor:pointer;transition:.1s;user-select:none}
+.email-row:hover{background:var(--bg4)}
+.email-row.selected{background:rgba(232,197,71,.07)}
+.email-text{font-size:11px;font-family:var(--mono);color:var(--muted);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:.1s}
+.email-row.selected .email-text{color:var(--text)}
+.status-badge{font-size:8px;font-weight:700;padding:2px 6px;border-radius:10px;text-transform:uppercase;letter-spacing:.4px;flex-shrink:0;white-space:nowrap}
+.s-answering{background:var(--green-bg);color:var(--green);border:1px solid rgba(74,222,128,.2)}
+.s-blacklisted{background:var(--red-bg);color:var(--red);border:1px solid rgba(248,113,113,.2)}
+.s-unknown{background:rgba(255,255,255,.04);color:var(--muted2);border:1px solid var(--border)}
+.s-notanswering{background:rgba(245,158,11,.08);color:var(--amber);border:1px solid rgba(245,158,11,.2)}
+
+/* Checkbox */
+.chk{width:14px;height:14px;border-radius:3px;border:1.5px solid var(--border2);background:var(--bg);flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:.1s;position:relative}
+.chk.on{background:var(--brand);border-color:var(--brand)}
+.chk.on::after{content:'✓';font-size:9px;color:#000;font-weight:900;line-height:1}
+.chk.partial{background:var(--bg);border-color:var(--brand)}
+.chk.partial::after{content:'–';font-size:10px;color:var(--brand);font-weight:900;line-height:1}
+.chk-company{width:16px;height:16px;border-radius:4px}
+
+/* Sel bar */
+.sel-bar{display:flex;align-items:center;justify-content:space-between;padding:6px 12px;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0}
+.sel-info{font-size:10px;color:var(--muted);font-family:var(--mono)}
+.sel-info strong{color:var(--brand)}
+
+/* ── Cards ── */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);overflow:hidden;box-shadow:var(--sh)}
+.card-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg3);border-bottom:1px solid var(--border);gap:8px;flex-wrap:wrap}
+.card-title{font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;display:flex;align-items:center;gap:6px}
+.card-body{padding:12px 14px}
+
+/* ── Buttons ── */
+.btn{padding:6px 14px;border-radius:var(--r);font-family:var(--font);font-size:11px;font-weight:700;cursor:pointer;border:1.5px solid transparent;transition:.12s;letter-spacing:.3px}
+.btn-primary{background:var(--brand);color:#000;border-color:var(--brand)}
+.btn-primary:hover{background:var(--brand-d);border-color:var(--brand-d)}
+.btn-ghost{background:var(--bg3);color:var(--muted);border-color:var(--border2)}
+.btn-ghost:hover{border-color:var(--muted);color:var(--text)}
+.btn-danger{background:transparent;color:var(--red);border-color:var(--border2)}
+.btn-danger:hover{border-color:var(--red)}
+.btn-send{padding:10px 28px;font-size:13px;background:var(--green);color:#000;border-color:var(--green);border-radius:30px}
+.btn-send:hover:not(:disabled){filter:brightness(1.1)}
+.btn-send:disabled{opacity:.35;cursor:not-allowed;filter:none}
+
+/* ── Inputs ── */
+.inp{width:100%;background:var(--bg3);border:1.5px solid var(--border2);border-radius:var(--r);color:var(--text);font-family:var(--mono);font-size:12px;padding:7px 10px;outline:none;transition:border .12s}
+.inp:focus{border-color:var(--brand)}
+.inp::placeholder{color:var(--muted2)}
+
+/* ── RFQ table ── */
+.rfq-grid{display:grid;grid-template-columns:22px 1fr 1fr 1.4fr 60px 24px;gap:5px;align-items:center}
+.rfq-head-row{font-size:8px;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:.6px;padding:0 0 6px;border-bottom:1px solid var(--border);margin-bottom:6px}
+.rfq-row-input{background:var(--bg3);border:1.5px solid var(--border);border-radius:var(--r);color:var(--text);font-family:var(--mono);font-size:11px;padding:5px 7px;outline:none;width:100%;transition:border .12s}
+.rfq-row-input:focus{border-color:var(--brand)}
+.rfq-row-input::placeholder{color:var(--muted2)}
+.del-btn{background:transparent;border:none;color:var(--muted2);font-size:15px;cursor:pointer;line-height:1;padding:0 2px;transition:.1s;font-family:monospace}
+.del-btn:hover{color:var(--red)}
+.rfq-rows{display:flex;flex-direction:column;gap:5px;margin-top:2px}
+
+/* ── Variant tabs ── */
+.vtabs{display:flex;flex-wrap:wrap;gap:4px;padding:10px 12px;background:var(--bg3);border-bottom:1px solid var(--border)}
+.vtab{padding:4px 11px;background:transparent;border:1px solid var(--border2);border-radius:20px;font-family:var(--font);font-size:10px;font-weight:600;cursor:pointer;color:var(--muted);transition:.12s}
+.vtab:hover{color:var(--text);border-color:var(--border)}
+.vtab.active{background:var(--brand);color:#000;border-color:var(--brand)}
+
+/* Subject row */
+.subj-row{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg3);border:1.5px solid var(--border2);border-radius:var(--r);margin-bottom:10px}
+.subj-label{font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
+.subj-inp{flex:1;border:none;outline:none;font-size:12px;font-family:var(--mono);background:transparent;color:var(--text)}
+
+/* Preview */
+.preview-box{font-family:var(--mono);font-size:12px;color:var(--text);line-height:1.85;white-space:pre-wrap;word-break:break-word;padding:14px;background:var(--bg3);border-radius:var(--r);min-height:60px;border:1px solid var(--border)}
+.preview-empty{padding:20px;text-align:center;color:var(--muted2);font-size:11px}
+
+/* Send panel */
+.send-panel{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);padding:14px 18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.send-info{font-size:11px;color:var(--muted);line-height:1.6}
+.send-info strong{color:var(--text)}
+
+/* Progress */
+.prog-item{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:11px;border-bottom:1px solid var(--border)}
+.prog-item:last-child{border-bottom:none}
+.prog-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.p-pending{background:var(--muted2)}
+.p-sending{background:var(--brand);animation:pulse 1s infinite}
+.p-sent{background:var(--green)}
+.p-failed{background:var(--red)}
+.prog-name{color:var(--text);font-weight:600;min-width:100px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prog-email{color:var(--muted);flex:1;font-family:var(--mono);font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prog-status{font-size:9px;font-weight:700;flex-shrink:0;letter-spacing:.3px}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+/* Upload zone */
+.upload-zone{border:2px dashed var(--border2);border-radius:8px;padding:22px;text-align:center;cursor:pointer;transition:.15s;color:var(--muted);font-size:11px}
+.upload-zone:hover{border-color:var(--brand);color:var(--brand)}
+.upload-icon{font-size:28px;margin-bottom:6px}
+
+/* Toast */
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:10px 20px;border-radius:8px;font-size:12px;font-weight:600;box-shadow:0 4px 24px rgba(0,0,0,.6);z-index:9999;display:none;align-items:center;gap:8px;white-space:nowrap;font-family:var(--font);background:var(--bg3);border:1px solid var(--border2)}
+#toast.show{display:flex}
+#toast.success{border-color:var(--green);color:var(--green)}
+#toast.error{border-color:var(--red);color:var(--red)}
+
+/* Notice */
+.notice{background:rgba(248,113,113,.07);border:1px solid rgba(248,113,113,.2);border-radius:8px;padding:12px 14px;font-size:11px;color:var(--red);line-height:1.7;font-family:var(--mono)}
+.notice a{color:var(--blue)}
+.notice code{background:rgba(255,255,255,.07);padding:1px 5px;border-radius:3px}
+
+/* Badge */
+.badge{display:inline-block;padding:2px 7px;border-radius:20px;font-size:8px;font-weight:700;letter-spacing:.5px;text-transform:uppercase}
+.badge-brand{background:var(--brand-bg);color:var(--brand);border:1px solid rgba(232,197,71,.25)}
+
+/* Divider */
+hr{border:none;border-top:1px solid var(--border);margin:10px 0}
+
+/* Filter pills */
+.filter-pills{display:flex;gap:5px;flex-wrap:wrap;padding:8px 12px;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0}
+.pill{padding:3px 10px;border-radius:20px;font-size:9px;font-weight:700;cursor:pointer;border:1px solid var(--border2);color:var(--muted);background:transparent;font-family:var(--font);transition:.12s;letter-spacing:.3px}
+.pill:hover{border-color:var(--muted)}
+.pill.active{color:#000}
+.pill-all.active{background:var(--text);border-color:var(--text)}
+.pill-answering.active{background:var(--green);border-color:var(--green)}
+.pill-unknown.active{background:var(--muted);border-color:var(--muted)}
+.pill-notanswering.active{background:var(--amber);border-color:var(--amber)}
+.pill-blacklisted.active{background:var(--red);border-color:var(--red)}
+
+/* No results */
+.no-results{padding:28px;text-align:center;color:var(--muted2);font-size:11px}
+
+/* Caret */
+.caret{font-size:10px;color:var(--muted2);transition:transform .2s;flex-shrink:0}
+.caret.open{transform:rotate(90deg)}
+
+/* Top user email display */
+.user-tag{font-size:10px;color:var(--muted);font-family:var(--mono)}
+
+/* Scroll lock for sidebar */
+.contacts-list{scrollbar-gutter:stable}
+
+/* responsive hint when too small */
+@media(max-width:700px){
+  .app{grid-template-columns:1fr;grid-template-rows:auto auto 1fr}
+  .sidebar{height:340px;position:static}
+  .main{height:auto}
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- TOP BAR -->
+  <header class="topbar">
+    <div class="logo">RFQ<span>Sender</span></div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span class="user-tag" id="userTag"></span>
+      <button class="btn-auth" id="authBtn" onclick="handleAuth()">
+        <span class="pulse"></span>
+        <span id="authLabel">Connect Gmail</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- SIDEBAR: Contacts -->
+  <aside class="sidebar">
+    <div class="sb-head">
+      <span class="sb-title">👥 Contacts <span id="loadedBadge" class="badge badge-brand" style="display:none"></span></span>
+      <div class="sb-actions">
+        <button class="btn btn-ghost" onclick="document.getElementById('jsonFile').click()" style="padding:4px 10px;font-size:10px">Upload JSON</button>
+        <input type="file" id="jsonFile" accept=".json" style="display:none" onchange="loadJSON(this)">
+      </div>
+    </div>
+
+    <!-- Filter pills -->
+    <div class="filter-pills" id="filterPills" style="display:none">
+      <button class="pill pill-all active" onclick="setFilter('all',this)">All</button>
+      <button class="pill pill-answering" onclick="setFilter('answering',this)">Answering</button>
+      <button class="pill pill-unknown" onclick="setFilter('unknown',this)">Unknown</button>
+      <button class="pill pill-notanswering" onclick="setFilter('notanswering',this)">Not Answering</button>
+      <button class="pill pill-blacklisted" onclick="setFilter('blacklisted',this)">Blacklisted</button>
+    </div>
+
+    <!-- Search -->
+    <div class="search-wrap" id="searchWrap" style="display:none">
+      <input class="search-inp" id="searchInp" placeholder="Search company or email…" oninput="renderContacts()" autocomplete="off">
+    </div>
+
+    <!-- Sel bar -->
+    <div class="sel-bar" id="selBar" style="display:none">
+      <span class="sel-info">Selected: <strong id="selCount">0</strong></span>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-ghost" style="padding:3px 9px;font-size:9px" onclick="selectFiltered()">Select All</button>
+        <button class="btn btn-ghost" style="padding:3px 9px;font-size:9px" onclick="clearSelection()">Clear</button>
+      </div>
+    </div>
+
+    <!-- Contacts list -->
+    <div class="contacts-list" id="contactsList">
+      <div class="upload-zone" onclick="document.getElementById('jsonFile').click()">
+        <div class="upload-icon">📂</div>
+        <div>Click to upload your <strong>data.json</strong></div>
+        <div style="margin-top:4px;color:var(--muted2)">Uses <code style="font-family:var(--mono);font-size:10px">directContact</code> section</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN: Template + Send -->
+  <main class="main">
+
+    <!-- Setup notice -->
+    <div class="notice" id="setupNotice">
+      ⚠ <strong>One-time setup:</strong> Replace <code>YOUR_GOOGLE_CLIENT_ID</code> in this file's &lt;script&gt; with your OAuth 2.0 Client ID.<br>
+      <a href="https://console.cloud.google.com/apis/credentials" target="_blank">console.cloud.google.com</a> → Create OAuth Client (Web app) → authorized origin: <code>file://</code> or your host → Enable Gmail API.
+    </div>
+
+    <!-- Template builder -->
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">📝 Template Builder</span>
+        <button class="btn btn-primary" onclick="addRow()" style="padding:4px 11px;font-size:10px">+ Add PN</button>
+      </div>
+      <div class="card-body">
+        <!-- Column headers -->
+        <div class="rfq-grid rfq-head-row">
+          <span>Use</span><span>Part Number</span><span>ALT PN <span style="opacity:.5;font-weight:400">(opt.)</span></span>
+          <span>Description</span><span style="text-align:center">QTY</span><span></span>
+        </div>
+        <div class="rfq-rows" id="rfqRows"></div>
+      </div>
+    </div>
+
+    <!-- Variant + Preview -->
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">✉️ Email Variant</span>
+        <button class="btn btn-primary" onclick="generatePreview()">Generate Preview</button>
+      </div>
+      <div class="vtabs" id="vtabs"></div>
+      <div class="card-body">
+        <div class="subj-row">
+          <span class="subj-label">Subject</span>
+          <input class="subj-inp" id="subjInp" placeholder="Auto-generated — edit if needed">
+          <button class="btn btn-ghost" style="padding:3px 10px;font-size:10px;flex-shrink:0" onclick="copySubject()">Copy</button>
+        </div>
+        <div id="previewBox" class="preview-empty">Fill in part numbers above, select a variant, then click Generate Preview.</div>
+      </div>
+    </div>
+
+    <!-- Send panel -->
+    <div class="send-panel">
+      <div class="send-info">
+        Sending to <strong id="sendToCount">0</strong> email(s) across <strong id="sendToCompanies">0</strong> company/companies
+        <br><span id="sendSubjPreview" style="font-family:var(--mono);font-size:10px;color:var(--muted2)">No template generated yet</span>
+      </div>
+      <button class="btn btn-send" id="sendBtn" disabled onclick="sendEmails()">🚀 Send Emails</button>
+    </div>
+
+    <!-- Progress -->
+    <div class="card" id="progressCard" style="display:none">
+      <div class="card-head">
+        <span class="card-title">📊 Send Progress</span>
+        <span id="progSummary" style="font-size:10px;color:var(--muted);font-family:var(--mono)"></span>
+      </div>
+      <div class="card-body" id="progBody" style="max-height:260px;overflow-y:auto;padding:8px 14px"></div>
+    </div>
+
+  </main>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════
+// CONFIG — replace with your Google OAuth Client ID
+// ══════════════════════════════════════════════
+const CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID';
+const SCOPE     = 'https://www.googleapis.com/auth/gmail.send';
+
+// ══════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════
+let gToken        = null;
+let userEmail     = '';
+let companies     = {};   // { companyName: [{email, status, blacklist_reason?}] }
+let selected      = new Set(); // set of email strings
+let currentFilter = 'all';
+let currentBody   = '';
+let rowId         = 0;
+let activeVariant = 0;
+
+// ══════════════════════════════════════════════
+// GOOGLE AUTH
+// ══════════════════════════════════════════════
+function handleAuth() {
+  if (gToken) { signOut(); return; }
+  if (!window.google) { showToast('Google API not loaded yet — refresh and try again.', 'error'); return; }
+  const client = google.accounts.oauth2.initTokenClient({
+    client_id: CLIENT_ID,
+    scope: SCOPE,
+    callback: async (resp) => {
+      if (resp.error) { showToast('Auth error: ' + resp.error, 'error'); return; }
+      gToken = resp.access_token;
+      try {
+        const r = await fetch('https://www.googleapis.com/gmail/v1/users/me/profile', {headers:{Authorization:'Bearer '+gToken}});
+        const d = await r.json();
+        userEmail = d.emailAddress || '';
+      } catch(_) {}
+      document.getElementById('authBtn').classList.add('on');
+      document.getElementById('authLabel').textContent = 'Gmail Connected';
+      document.getElementById('userTag').textContent = userEmail;
+      document.getElementById('setupNotice').style.display = 'none';
+      showToast('Connected as ' + userEmail);
+      updateSendBtn();
+    }
+  });
+  client.requestAccessToken();
+}
+function signOut() {
+  gToken = null; userEmail = '';
+  document.getElementById('authBtn').classList.remove('on');
+  document.getElementById('authLabel').textContent = 'Connect Gmail';
+  document.getElementById('userTag').textContent = '';
+  showToast('Disconnected', 'error');
+  updateSendBtn();
+}
+
+// ══════════════════════════════════════════════
+// LOAD JSON
+// ══════════════════════════════════════════════
+function loadJSON(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (!data.directContact) { showToast('No directContact key found in JSON', 'error'); return; }
+      companies = data.directContact;
+      selected.clear();
+      currentFilter = 'all';
+      document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+      document.querySelector('.pill-all').classList.add('active');
+      document.getElementById('filterPills').style.display = 'flex';
+      document.getElementById('searchWrap').style.display = 'block';
+      document.getElementById('selBar').style.display = 'flex';
+      const totalEmails = Object.values(companies).reduce((a,arr)=>a+arr.length,0);
+      const badge = document.getElementById('loadedBadge');
+      badge.textContent = Object.keys(companies).length + ' companies';
+      badge.style.display = 'inline-block';
+      renderContacts();
+      updateSelCount();
+      showToast('Loaded ' + Object.keys(companies).length + ' companies / ' + totalEmails + ' emails');
+    } catch(e) { showToast('Invalid JSON: ' + e.message, 'error'); }
+  };
+  reader.readAsText(file);
+  input.value = '';
+}
+
+// ══════════════════════════════════════════════
+// FILTER
+// ══════════════════════════════════════════════
+function setFilter(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  renderContacts();
+}
+
+function emailMatchesFilter(entry) {
+  if (currentFilter === 'all') return true;
+  const s = (entry.status || '').toLowerCase().replace(/\s/g,'');
+  if (currentFilter === 'answering')    return s === 'answering';
+  if (currentFilter === 'unknown')      return s === 'unknown';
+  if (currentFilter === 'notanswering') return s === 'notanswering' || s === 'notfound';
+  if (currentFilter === 'blacklisted')  return s === 'blacklisted';
+  return true;
+}
+
+// ══════════════════════════════════════════════
+// RENDER CONTACTS
+// ══════════════════════════════════════════════
+function renderContacts() {
+  const query = (document.getElementById('searchInp')?.value || '').toLowerCase().trim();
+  const list  = document.getElementById('contactsList');
+  list.innerHTML = '';
+  let visibleCompanies = 0;
+
+  Object.entries(companies).forEach(([company, emails]) => {
+    // Filter emails by status filter
+    const filteredEmails = emails.filter(e => emailMatchesFilter(e));
+    if (!filteredEmails.length) return;
+
+    // Search match: company name OR any email
+    if (query) {
+      const nameMatch = company.toLowerCase().includes(query);
+      const emailMatch = filteredEmails.some(e => e.email.toLowerCase().includes(query));
+      if (!nameMatch && !emailMatch) return;
+    }
+
+    visibleCompanies++;
+
+    // Which emails to show (if search, highlight matching emails but show all filtered)
+    const emailsToShow = query
+      ? filteredEmails.filter(e => company.toLowerCase().includes(query) || e.email.toLowerCase().includes(query))
+      : filteredEmails;
+
+    const selectedInCompany = emailsToShow.filter(e => selected.has(e.email)).length;
+    const allSelected = selectedInCompany === emailsToShow.length && emailsToShow.length > 0;
+    const partial = selectedInCompany > 0 && !allSelected;
+
+    const group = document.createElement('div');
+    group.className = 'company-group';
+
+    // Company header
+    const header = document.createElement('div');
+    header.className = 'company-header' + (allSelected ? ' all-selected' : '');
+    header.innerHTML = `
+      <div class="chk chk-company ${allSelected?'on':partial?'partial':''}" id="chk-co-${CSS.escape(company)}"></div>
+      <span class="company-name" title="${escHtml(company)}">${escHtml(company)}</span>
+      <span class="company-count">${selectedInCompany}/${emailsToShow.length}</span>
+      <span class="caret open" id="caret-${CSS.escape(company)}">▶</span>
+    `;
+    header.onclick = (e) => {
+      if (e.target.classList.contains('chk') || e.target.closest('.chk')) {
+        toggleCompany(emailsToShow, allSelected);
+      } else {
+        toggleExpand(emailBody, header.querySelector('.caret'));
+      }
+    };
+    // Checkbox click area
+    header.querySelector('.chk').addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleCompany(emailsToShow, allSelected);
+    });
+
+    // Email rows
+    const emailBody = document.createElement('div');
+    emailBody.className = 'company-emails open';
+
+    emailsToShow.forEach(entry => {
+      const emailStr = entry.email;
+      const isSelected = selected.has(emailStr);
+      const statusKey = (entry.status||'').toLowerCase().replace(/\s/g,'');
+      const statusClass = statusKey === 'answering' ? 's-answering'
+        : statusKey === 'blacklisted' ? 's-blacklisted'
+        : statusKey === 'notanswering' || statusKey === 'notfound' ? 's-notanswering'
+        : 's-unknown';
+      const statusLabel = entry.status || 'Unknown';
+
+      const row = document.createElement('div');
+      row.className = 'email-row' + (isSelected ? ' selected' : '');
+      row.innerHTML = `
+        <div class="chk ${isSelected?'on':''}"></div>
+        <span class="email-text" title="${escHtml(emailStr)}">${escHtml(emailStr)}</span>
+        <span class="status-badge ${statusClass}">${escHtml(statusLabel)}</span>
+      `;
+      row.onclick = () => {
+        if (selected.has(emailStr)) selected.delete(emailStr);
+        else selected.add(emailStr);
+        updateSelCount();
+        renderContacts();
+      };
+      emailBody.appendChild(row);
+    });
+
+    group.appendChild(header);
+    group.appendChild(emailBody);
+    list.appendChild(group);
+  });
+
+  if (visibleCompanies === 0) {
+    list.innerHTML = '<div class="no-results">No contacts match your search.</div>';
+  }
+}
+
+function toggleExpand(emailBody, caret) {
+  const open = emailBody.classList.toggle('open');
+  if (caret) caret.classList.toggle('open', open);
+}
+
+function toggleCompany(emails, allSelected) {
+  if (allSelected) emails.forEach(e => selected.delete(e.email));
+  else emails.forEach(e => selected.add(e.email));
+  updateSelCount();
+  renderContacts();
+}
+
+function selectFiltered() {
+  const query = (document.getElementById('searchInp')?.value || '').toLowerCase().trim();
+  Object.entries(companies).forEach(([company, emails]) => {
+    const filtered = emails.filter(e => emailMatchesFilter(e));
+    if (!filtered.length) return;
+    if (query) {
+      const nameMatch = company.toLowerCase().includes(query);
+      const emailMatch = filtered.some(e => e.email.toLowerCase().includes(query));
+      if (!nameMatch && !emailMatch) return;
+    }
+    filtered.forEach(e => selected.add(e.email));
+  });
+  updateSelCount();
+  renderContacts();
+}
+
+function clearSelection() {
+  selected.clear();
+  updateSelCount();
+  renderContacts();
+}
+
+function updateSelCount() {
+  document.getElementById('selCount').textContent = selected.size;
+  // Count how many companies have at least 1 selected
+  let comps = 0;
+  Object.values(companies).forEach(emails => {
+    if (emails.some(e => selected.has(e.email))) comps++;
+  });
+  document.getElementById('sendToCount').textContent = selected.size;
+  document.getElementById('sendToCompanies').textContent = comps;
+  updateSendBtn();
+}
+
+// ══════════════════════════════════════════════
+// RFQ ROWS
+// ══════════════════════════════════════════════
+function addRow() {
+  const id = ++rowId;
+  const wrap = document.getElementById('rfqRows');
+  const row = document.createElement('div');
+  row.id = 'rfqrow-' + id;
+  row.className = 'rfq-grid';
+  row.innerHTML = `
+    <input type="checkbox" id="ruse-${id}" checked style="width:14px;height:14px;accent-color:var(--brand);cursor:pointer;margin:0 auto;display:block">
+    <input class="rfq-row-input" id="rpn-${id}"  placeholder="e.g. 0123FA2" autocomplete="off">
+    <input class="rfq-row-input" id="ralt-${id}" placeholder="ALT PN" autocomplete="off">
+    <input class="rfq-row-input" id="rdsc-${id}" placeholder="e.g. SENSOR - LOW FLOW" autocomplete="off">
+    <input class="rfq-row-input" id="rqty-${id}" placeholder="QTY" type="number" min="1" style="text-align:center" autocomplete="off">
+    <button class="del-btn" onclick="removeRow(${id})" title="Remove">×</button>
+  `;
+  wrap.appendChild(row);
+}
+
+function removeRow(id) {
+  const el = document.getElementById('rfqrow-' + id);
+  if (el) el.remove();
+}
+
+function getItems() {
+  const items = [];
+  document.querySelectorAll('[id^="rfqrow-"]').forEach(row => {
+    const id = row.id.replace('rfqrow-', '');
+    const used = document.getElementById('ruse-' + id)?.checked;
+    if (!used) return;
+    const pn   = (document.getElementById('rpn-'  + id)?.value || '').trim();
+    const alt  = (document.getElementById('ralt-' + id)?.value || '').trim();
+    const desc = (document.getElementById('rdsc-' + id)?.value || '').trim();
+    const qty  = (document.getElementById('rqty-' + id)?.value || '').trim();
+    if (pn) items.push({pn, alt, desc, qty});
+  });
+  return items;
+}
+
+function buildLines(items) {
+  return items.map(i => {
+    let l = i.pn;
+    if (i.alt) { l += ' / ALT: ' + i.alt; if (i.desc) l += ' / ' + i.desc; }
+    else if (i.desc) l += ' / ' + i.desc;
+    if (i.qty) l += ' / QTY: ' + i.qty;
+    return l;
+  }).join('\n');
+}
+
+// ══════════════════════════════════════════════
+// VARIANTS
+// ══════════════════════════════════════════════
+const VARIANTS = [
+  {label:'Check Availability', build(it){
+    const m=it.length>1, l=buildLines(it);
+    const s=m?"RFQ PN's "+it.map(i=>i.pn).join(' / '):"RFQ PN "+it[0].pn;
+    return{subject:s,body:"Dear team,\n\nIs this offer still valid for:\n\n"+l+"\n\nThank you."};
+  }},
+  {label:'Option 1', build(it){
+    const m=it.length>1,l=buildLines(it);
+    const s=m?"RFQ PN's "+it.map(i=>i.pn).join(' / '):"RFQ PN "+it[0].pn;
+    return{subject:s,body:"Hello,\n\nPlease provide your best price quote and stock availability and the certification for the following item"+(m?'s':'')+":\n\n"+l+"\n\nThank you.\nBest regards"};
+  }},
+  {label:'Option 2', build(it){
+    const m=it.length>1,l=buildLines(it);
+    const s=m?"RFQ PN's "+it.map(i=>i.pn).join(' / '):"RFQ PN "+it[0].pn;
+    return{subject:s,body:"Good day,\n\nWe would appreciate your best price, availability and the certification for the item"+(m?'s':'')+" below:\n\n"+l+"\n\nWe look forward to your response.\nKind regards"};
+  }},
+  {label:'Option 3', build(it){
+    const m=it.length>1,l=buildLines(it);
+    const s=m?"RFQ PN's "+it.map(i=>i.pn).join(' / '):"RFQ PN "+it[0].pn;
+    return{subject:s,body:"Hi,\n\nQuick RFQ — please send best price, availability & the certification:\n\n"+l+"\n\nThanks!"};
+  }},
+  {label:'Option 5 — Competitive', build(it){
+    const m=it.length>1,l=buildLines(it);
+    const s=m?"RFQ PN's "+it.map(i=>i.pn).join(' / '):"RFQ PN "+it[0].pn;
+    return{subject:s,body:"Hello,\n\nCould you please provide your most competitive price, current availability and the certification for the following item"+(m?'s':'')+"?\n\n"+l+"\n\nWe look forward to your offer.\nBest regards"};
+  }},
+  {label:'Option 6 — ASAP', build(it){
+    const m=it.length>1,l=buildLines(it);
+    const s=m?"RFQ PN's "+it.map(i=>i.pn).join(' / '):"RFQ PN "+it[0].pn;
+    return{subject:s,body:"Hello,\n\nWe need your best price, stock availability and the certification for the following item"+(m?'s':'')+". Please reply at your earliest convenience.\n\n"+l+"\n\nThank you.\nBest regards"};
+  }},
+  {label:'Option 7 — AOG', build(it){
+    const m=it.length>1,l=buildLines(it);
+    const s=m?"AOG — RFQ PN's "+it.map(i=>i.pn).join(' / '):"AOG — RFQ PN "+it[0].pn;
+    return{subject:s,body:"Dear Team,\n\nAOG SITUATION — We urgently require your best price, stock availability and the certification for the following item"+(m?'s':'')+" Please revert ASAP.\n\n"+l+"\n\nThank you.\nBest regards"};
+  }},
+  {label:'Option 8 — Partner', build(it){
+    const m=it.length>1,l=buildLines(it);
+    const s=m?"RFQ PN's "+it.map(i=>i.pn).join(' / '):"RFQ PN "+it[0].pn;
+    return{subject:s,body:"Dear Partner,\n\nHope you are well. We have a sourcing requirement and would appreciate your best offer, including availability and the certification:\n\n"+l+"\n\nLooking forward to your feedback.\nBest regards"};
+  }},
+  {label:'Option 9', build(it){
+    const m=it.length>1,l=buildLines(it);
+    const s=m?"RFQ PN's "+it.map(i=>i.pn).join(' / '):"RFQ PN "+it[0].pn;
+    return{subject:s,body:"Hello,\n\nWe are currently sourcing the below item"+(m?'s':'')+" and collecting competitive offers. Please provide your best price, stock availability and the certification at your earliest:\n\n"+l+"\n\nThank you.\nBest regards"};
+  }},
+  {label:'Option 12 — Best Price', build(it){
+    const m=it.length>1,l=buildLines(it);
+    const s=m?"RFQ PN's "+it.map(i=>i.pn).join(' / '):"RFQ PN "+it[0].pn;
+    return{subject:s,body:"Hello,\n\nWe are receiving multiple offers for the below item"+(m?'s':'')+". Please provide your absolute best price, availability and the certification to remain competitive:\n\n"+l+"\n\nBest regards"};
+  }},
+  {label:'Option 13 — Direct', build(it){
+    const m=it.length>1,l=buildLines(it);
+    const s=m?"RFQ PN's "+it.map(i=>i.pn).join(' / '):"RFQ PN "+it[0].pn;
+    return{subject:s,body:"Dear Sales Team,\n\nWe are reaching out to you directly regarding the following part"+(m?'s':'')+". Could you please advise on availability, lead time, price and the certification?\n\n"+l+"\n\nThank you for your time.\nBest regards"};
+  }},
+  {label:'Option 16 — Any Condition', build(it){
+    const m=it.length>1,l=buildLines(it);
+    const s=m?"RFQ PN's "+it.map(i=>i.pn).join(' / '):"RFQ PN "+it[0].pn;
+    return{subject:s,body:"Hello,\n\nWe are open to any airworthy condition (OH, SV, RP, NE). Please provide your best price, stock availability and the certification for the following item"+(m?'s':'')+":\n\n"+l+"\n\nThank you.\nBest regards"};
+  }},
+];
+
+function initTabs() {
+  const bar = document.getElementById('vtabs');
+  bar.innerHTML = '';
+  VARIANTS.forEach((v, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'vtab' + (i === activeVariant ? ' active' : '');
+    btn.textContent = v.label;
+    btn.onclick = () => {
+      document.querySelectorAll('.vtab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activeVariant = i;
+      // Re-generate if there's already a preview
+      if (currentBody) generatePreview();
+    };
+    bar.appendChild(btn);
+  });
+}
+
+function generatePreview() {
+  const items = getItems();
+  if (!items.length) { showToast('Add at least one Part Number', 'error'); return; }
+  const result = VARIANTS[activeVariant].build(items);
+  currentBody = result.body;
+  document.getElementById('subjInp').value = result.subject;
+  const box = document.getElementById('previewBox');
+  box.className = 'preview-box';
+  box.textContent = result.body;
+  document.getElementById('sendSubjPreview').textContent = result.subject;
+  updateSendBtn();
+}
+
+function copySubject() {
+  const v = document.getElementById('subjInp').value;
+  if (!v) return;
+  navigator.clipboard.writeText(v).then(() => showToast('Subject copied!'));
+}
+
+// ══════════════════════════════════════════════
+// SEND
+// ══════════════════════════════════════════════
+function updateSendBtn() {
+  const ok = gToken && currentBody && selected.size > 0;
+  document.getElementById('sendBtn').disabled = !ok;
+}
+
+function makeRaw(to, subject, body) {
+  const msg = [`To: ${to}`, `Subject: ${subject}`, `MIME-Version: 1.0`,
+    `Content-Type: text/plain; charset=UTF-8`, ``, body].join('\r\n');
+  return btoa(unescape(encodeURIComponent(msg))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+
+async function gmailSend(to, subject, body) {
+  const res = await fetch('https://www.googleapis.com/gmail/v1/users/me/messages/send', {
+    method:'POST',
+    headers:{Authorization:'Bearer '+gToken,'Content-Type':'application/json'},
+    body: JSON.stringify({raw: makeRaw(to, subject, body)})
+  });
+  if (!res.ok) {
+    const e = await res.json();
+    throw new Error(e.error?.message || 'Send failed');
+  }
+}
+
+async function sendEmails() {
+  if (!gToken)        { showToast('Connect Gmail first', 'error'); return; }
+  if (!currentBody)   { showToast('Generate a template first', 'error'); return; }
+  if (!selected.size) { showToast('Select at least one contact', 'error'); return; }
+
+  const subject = document.getElementById('subjInp').value || '(no subject)';
+  const targets = [...selected];
+  const progress = targets.map(email => {
+    // find company name for display
+    let company = '';
+    for (const [co, emails] of Object.entries(companies)) {
+      if (emails.some(e => e.email === email)) { company = co; break; }
+    }
+    return {email, company, status:'pending'};
+  });
+
+  document.getElementById('progressCard').style.display = 'block';
+  document.getElementById('progressCard').scrollIntoView({behavior:'smooth', block:'nearest'});
+  renderProgress(progress);
+  document.getElementById('sendBtn').disabled = true;
+
+  let sent = 0, failed = 0;
+  for (let i = 0; i < progress.length; i++) {
+    progress[i].status = 'sending';
+    renderProgress(progress);
+    try {
+      await gmailSend(progress[i].email, subject, currentBody);
+      progress[i].status = 'sent';
+      sent++;
+    } catch(err) {
+      progress[i].status = 'failed';
+      progress[i].error  = err.message;
+      failed++;
+    }
+    renderProgress(progress);
+    await new Promise(r => setTimeout(r, 350));
+  }
+
+  document.getElementById('progSummary').textContent = `${sent} sent · ${failed} failed`;
+  document.getElementById('sendBtn').disabled = false;
+  showToast(`Done! ${sent} sent, ${failed} failed.`, sent > 0 ? 'success' : 'error');
+}
+
+function renderProgress(prog) {
+  const body = document.getElementById('progBody');
+  body.innerHTML = '';
+  prog.forEach(p => {
+    const statusColor = p.status==='sent'?'var(--green)':p.status==='failed'?'var(--red)':p.status==='sending'?'var(--brand)':'var(--muted2)';
+    const statusLabel = p.status==='sent'?'✓ Sent':p.status==='failed'?`✗ ${p.error||'Failed'}`:p.status==='sending'?'Sending…':'Pending';
+    const div = document.createElement('div');
+    div.className = 'prog-item';
+    div.innerHTML = `
+      <div class="prog-dot p-${p.status}"></div>
+      <span class="prog-name" title="${escHtml(p.company)}">${escHtml(p.company||'—')}</span>
+      <span class="prog-email" title="${escHtml(p.email)}">${escHtml(p.email)}</span>
+      <span class="prog-status" style="color:${statusColor}">${statusLabel}</span>
+    `;
+    body.appendChild(div);
+  });
+}
+
+// ══════════════════════════════════════════════
+// UTILS
+// ══════════════════════════════════════════════
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+let toastTimer;
+function showToast(msg, type='success') {
+  const t = document.getElementById('toast');
+  t.textContent = (type==='success'?'✓ ':'✗ ') + msg;
+  t.className = 'show ' + type;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.className = '', 3200);
+}
+
+// ══════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════
+initTabs();
+addRow();
+</script>
+</body>
+</html>
