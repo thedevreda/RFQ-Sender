@@ -265,7 +265,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
     <div class="search-wrap" id="s1wrap" style="display:none">
       <input class="search-inp" id="s1inp" placeholder="Search company or email…" oninput="renderCoList()" autocomplete="off">
     </div>
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-bottom:1px solid var(--border);flex-shrink:0" id="selBar" style="display:none">
+    <div style="display:none;align-items:center;justify-content:space-between;padding:6px 10px;border-bottom:1px solid var(--border);flex-shrink:0" id="selBar">
       <span style="font-size:10px;color:var(--muted);font-family:var(--mono)">Selected: <strong id="selCount" style="color:var(--brand)">0</strong> emails</span>
       <div style="display:flex;gap:5px">
         <button class="btn btn-ghost" style="padding:3px 8px;font-size:9px" onclick="selAll()">All</button>
@@ -379,11 +379,11 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
 // ════════════════════════════════════════════════
 // CONFIG
 // ════════════════════════════════════════════════
-const CLIENT_ID  = '916200367495-f4pvfd5kgmg7plcd7f3rnpk43ue861i6.apps.googleusercontent.com'; // ← replace
+const CLIENT_ID  = 'YOUR_GOOGLE_CLIENT_ID'; // ← replace
 const SCOPE      = 'https://www.googleapis.com/auth/gmail.send';
 const DATA_URL   = '/data.json';
 const SIGN_URL   = '/sign.html';
-const CC_ADDR    = 'redaamelloul@gmail.com';
+const CC_ADDR    = 'sales@jadaero.com';
 
 // ════════════════════════════════════════════════
 // STATE
@@ -404,13 +404,7 @@ let pnAssign  = {};
 // sendQueue: [{coName, emails[], pns[], status, error}]
 let sendQueue = [];
 
-// ════════════════════════════════════════════════
-// INIT
-// ════════════════════════════════════════════════
-initTabs();
-addRow();
-fetchSign();
-fetchContacts();
+// Init calls moved to bottom of script after all functions are defined
 
 async function fetchSign() {
   try { signHtml = await (await fetch(SIGN_URL)).text(); } catch(_){}
@@ -989,6 +983,15 @@ function showToast(msg,type='ok'){
   clearTimeout(_tt);
   _tt=setTimeout(()=>t.className='',3400);
 }
+
+// ════════════════════════════════════════════════
+// INIT — all functions defined above before calling
+// ════════════════════════════════════════════════
+initTabs();
+addRow();
+fetchSign();
+fetchContacts();
+
 </script>
 </body>
 </html>
