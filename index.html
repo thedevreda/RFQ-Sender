@@ -418,17 +418,47 @@ async function fetchSign() {
 
 async function fetchContacts() {
   try {
-    const data = await (await fetch(DATA_URL)).json();
-    if (!data.directContact) throw new Error('No directContact key');
-    companies = data.directContact;
-    document.getElementById('s1empty').style.display = 'none';
-    document.getElementById('pillRow').style.display = 'flex';
-    document.getElementById('s1wrap').style.display  = 'block';
-    document.getElementById('selBar').style.display  = 'flex';
-    renderCoList();
+    const res  = await fetch(DATA_URL);
+    if (!res.ok) throw new Error('HTTP ' + res.status + ' — could not load ' + DATA_URL);
+    const data = await res.json();
+    if (!data.directContact) throw new Error('No directContact key found in JSON');
+    ingestContacts(data.directContact);
   } catch(e) {
-    document.getElementById('s1empty').innerHTML = `<div style="color:var(--red)">⚠ ${e.message}</div>`;
+    // Show error + fallback upload button
+    document.getElementById('s1empty').innerHTML = `
+      <div style="color:var(--red);margin-bottom:12px">⚠ ${esc(e.message)}</div>
+      <div style="color:var(--muted2);font-size:10px;margin-bottom:10px">Or load manually:</div>
+      <label style="display:inline-block;padding:7px 16px;background:var(--brand);color:#000;border-radius:var(--r);font-size:11px;font-weight:700;cursor:pointer">
+        Upload data.json
+        <input type="file" accept=".json" style="display:none" onchange="loadLocalJson(this)">
+      </label>`;
   }
+}
+
+function loadLocalJson(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (!data.directContact) throw new Error('No directContact key');
+      ingestContacts(data.directContact);
+      showToast('Contacts loaded ✓');
+    } catch(e) { showToast('Invalid JSON: ' + e.message, 'er'); }
+  };
+  reader.readAsText(file);
+}
+
+function ingestContacts(dc) {
+  companies = dc;
+  const total = Object.values(companies).reduce((a,arr)=>a+arr.length,0);
+  document.getElementById('s1empty').style.display = 'none';
+  document.getElementById('pillRow').style.display = 'flex';
+  document.getElementById('s1wrap').style.display  = 'block';
+  document.getElementById('selBar').style.display  = 'flex';
+  renderCoList();
+  showToast(Object.keys(companies).length + ' companies · ' + total + ' emails loaded');
 }
 
 // ════════════════════════════════════════════════
@@ -772,8 +802,8 @@ function genPreview(pnsOverride) {
 
   const fn   = document.getElementById('optFN').checked;
   const dear = document.getElementById('optDear').checked;
-  let greet = '';
-  if (dear)  greet = 'Dear,\n\n';
+  let greet = 'Hello dear,\n\n';
+  if (dear)   greet = 'Dear,\n\n';
   else if(fn) greet = 'Dear [FirstName],\n\n';
 
   const box = document.getElementById('prevBox');
@@ -866,9 +896,9 @@ function updateSendBtn() {
 function buildRaw(to, subject, bodyText, cc) {
   const fn   = document.getElementById('optFN').checked;
   const dear = document.getElementById('optDear').checked;
-  let gHtml='', gTxt='';
-  if (dear)       { gHtml='<p>Dear,</p>';                         gTxt='Dear,\n\n'; }
-  else if(fn)     { const nm=extractFirst(to); gHtml=`<p>Dear ${nm},</p>`; gTxt=`Dear ${nm},\n\n`; }
+  let gHtml='<p>Hello dear,</p>', gTxt='Hello dear,\n\n';
+  if (dear)   { gHtml='<p>Dear,</p>';                                  gTxt='Dear,\n\n'; }
+  else if(fn) { const nm=extractFirst(to); gHtml=`<p>Dear ${nm},</p>`; gTxt=`Dear ${nm},\n\n`; }
 
   const bodyHtml = bodyText.split('\n').map(l=>l?`<p style="margin:0 0 4px">${esc(l)}</p>`:'<br>').join('');
   const html = `<html><body style="font-family:Arial,sans-serif;font-size:13px;color:#333;line-height:1.6">${gHtml}${bodyHtml}${signHtml}</body></html>`;
